@@ -1,768 +1,1238 @@
 
-from pathlib import Path
-from datetime import date
-import uuid
-
-import pandas as pd
-import pydeck as pdk
 import streamlit as st
+import pandas as pd
+import os
+import uuid
+from datetime import datetime
 
-# --------------------------------------------------
-# CivicAI | Civic Issue Intelligence
-# --------------------------------------------------
-
-BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
-CSV_PATH = DATA_DIR / "complaints.csv"
-LOGO_PATH = BASE_DIR / "civicai_logo.png"
-
-DATA_DIR.mkdir(exist_ok=True)
+# =========================================================
+# CIVICAI CONFIGURATION
+# =========================================================
 
 st.set_page_config(
-    page_title="CivicAI | Civic Issue Intelligence",
+    page_title="CivicAI | Smart Civic Portal",
     page_icon="🏙️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Calm navy + blue + teal + green theme
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+DATA_DIR = "data"
+DATA_FILE = os.path.join(DATA_DIR, "complaints.csv")
+UPLOAD_DIR = "uploads"
 
-    :root {
-        --navy: #101b36;
-        --blue: #477fe5;
-        --teal: #36b7b0;
-        --green: #35ad70;
-        --text: #eaf0ff;
-        --muted: #aab8d3;
-        --panel: rgba(25, 39, 70, 0.78);
-        --border: rgba(150, 177, 224, 0.19);
-    }
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-    .stApp {
-        background:
-            radial-gradient(ellipse at 12% 12%, rgba(58, 101, 190, 0.20), transparent 38%),
-            radial-gradient(ellipse at 86% 22%, rgba(38, 159, 151, 0.12), transparent 35%),
-            linear-gradient(135deg, #0c1530 0%, #111d3b 48%, #101a32 100%);
-        color: var(--text);
-        font-family: 'DM Sans', sans-serif;
-    }
+# =========================================================
+# PASTEL THEME AND ANIMATIONS - ORIGINAL INTERFACE
+# =========================================================
 
-    /* Subtle moving light: no images, no JavaScript */
-    .stApp::before {
-        content: "";
-        position: fixed;
-        inset: -40%;
-        z-index: 0;
-        pointer-events: none;
-        background: conic-gradient(
-            from 0deg at 50% 50%,
-            transparent 0deg,
-            rgba(60, 126, 219, 0.07) 65deg,
-            transparent 130deg,
-            rgba(43, 183, 165, 0.06) 210deg,
-            transparent 280deg
-        );
-        animation: slowGlow 32s linear infinite;
-    }
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
 
-    @keyframes slowGlow {
-        from { transform: rotate(0deg); }
-        to   { transform: rotate(360deg); }
-    }
+:root {
+    --ink: #26364a;
+    --muted: #65758b;
+    --blue: #7399d4;
+    --teal: #68b9ad;
+    --lavender: #b5a8e8;
+    --pink: #e9b7ca;
+}
 
-    [data-testid="stHeader"] {
-        background: rgba(12, 21, 48, 0.72);
-    }
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+    color: var(--ink);
+}
 
-    [data-testid="stSidebar"] {
-        background: rgba(12, 22, 45, 0.94);
-        border-right: 1px solid var(--border);
-    }
+.stApp {
+    background:
+        radial-gradient(ellipse at 5% 5%, #e4eee8 0%, transparent 38%),
+        radial-gradient(ellipse at 95% 8%, #e6e3fa 0%, transparent 35%),
+        radial-gradient(ellipse at 50% 100%, #f7e8ef 0%, transparent 42%),
+        linear-gradient(135deg, #f2f6f0, #eef1fb 55%, #fbf0f3);
+    background-attachment: fixed;
+}
 
-    .block-container {
-        position: relative;
-        z-index: 1;
-        padding-top: 1.8rem;
-        padding-bottom: 3rem;
-        max-width: 1500px;
-    }
+.block-container {
+    padding-top: 1.8rem;
+    padding-bottom: 3rem;
+    max-width: 1400px;
+}
 
-    h1, h2, h3 {
-        font-family: 'Manrope', sans-serif !important;
-        color: #f4f7ff !important;
-        letter-spacing: -0.5px;
-    }
+h1, h2, h3 {
+    font-family: 'Outfit', sans-serif !important;
+    color: #26364a !important;
+}
 
-    p, label, span, div {
-        font-family: 'DM Sans', sans-serif;
-    }
+.hero {
+    padding: 34px;
+    border-radius: 28px;
+    background: linear-gradient(
+        120deg,
+        rgba(255,255,255,.82),
+        rgba(225,238,246,.78),
+        rgba(239,230,250,.78)
+    );
+    border: 1px solid rgba(255,255,255,.85);
+    box-shadow: 0 14px 40px rgba(72,91,126,.10);
+    animation: fadeUp .7s ease-out;
+    margin-bottom: 24px;
+}
 
-    .hero {
-        position: relative;
-        overflow: hidden;
-        padding: 26px 30px;
-        border: 1px solid var(--border);
-        border-radius: 22px;
-        background: linear-gradient(
-            115deg,
-            rgba(38, 61, 108, 0.86),
-            rgba(22, 43, 73, 0.80) 58%,
-            rgba(25, 83, 88, 0.45)
-        );
-        margin-bottom: 24px;
-        box-shadow: 0 18px 45px rgba(0, 0, 0, 0.12);
-        animation: enterUp 0.7s ease both;
-    }
+.hero-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(2.2rem, 5vw, 3.8rem);
+    line-height: 1.08;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    color: #26364a;
+}
 
-    .hero::after {
-        content: "";
-        position: absolute;
-        width: 230px;
-        height: 230px;
-        right: -80px;
-        top: -110px;
-        border-radius: 50%;
-        border: 1px solid rgba(110, 180, 238, 0.22);
-        box-shadow: 0 0 0 28px rgba(100, 160, 225, 0.035),
-                    0 0 0 58px rgba(100, 160, 225, 0.025);
-        animation: breathe 7s ease-in-out infinite;
-    }
+.hero-title span {
+    background: linear-gradient(90deg, #5a91c9, #62afa4, #9c8bda);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
 
-    @keyframes breathe {
-        0%, 100% { transform: scale(1); opacity: 0.65; }
-        50% { transform: scale(1.08); opacity: 1; }
-    }
+.subtitle {
+    color: #65758b;
+    font-size: 1.05rem;
+    line-height: 1.7;
+}
 
-    @keyframes enterUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+.section-label {
+    color: #638b91;
+    font-size: .76rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
 
-    .eyebrow {
-        color: #77d8cf;
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        margin-bottom: 8px;
-    }
+.soft-card {
+    background: rgba(255,255,255,.74);
+    border: 1px solid rgba(255,255,255,.9);
+    border-radius: 22px;
+    padding: 22px;
+    box-shadow: 0 8px 26px rgba(72,91,126,.07);
+    transition: transform .25s ease, box-shadow .25s ease;
+    margin-bottom: 14px;
+}
 
-    .hero-title {
-        font-family: 'Manrope', sans-serif;
-        font-size: clamp(2rem, 4vw, 3.2rem);
-        line-height: 1.15;
-        font-weight: 800;
-        margin: 0;
-        color: #f6f8ff;
-    }
+.soft-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px rgba(72,91,126,.12);
+}
 
-    .hero-title .accent { color: #62d3aa; }
+.metric-card {
+    background: rgba(255,255,255,.78);
+    border: 1px solid rgba(255,255,255,.95);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 7px 22px rgba(72,91,126,.07);
+    animation: fadeUp .5s ease-out;
+}
 
-    .hero-subtitle {
-        color: #c0cde5;
-        font-size: 1rem;
-        margin-top: 12px;
-        max-width: 720px;
-        line-height: 1.7;
-    }
+.metric-label {
+    color: #65758b;
+    font-size: .88rem;
+    font-weight: 600;
+}
 
-    .section-kicker {
-        color: #85d7d0;
-        font-size: 0.76rem;
-        font-weight: 700;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        margin-bottom: 6px;
-    }
+.metric-value {
+    color: #26364a;
+    font-family: 'Outfit', sans-serif;
+    font-size: 2rem;
+    font-weight: 800;
+    margin-top: 5px;
+}
 
-    .metric-card {
-        background: linear-gradient(145deg, rgba(34, 51, 87, 0.88),
-                                    rgba(23, 38, 67, 0.83));
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 18px 20px;
-        min-height: 122px;
-        transition: transform 0.25s ease, border-color 0.25s ease;
-        animation: enterUp 0.6s ease both;
-    }
+.pill {
+    display: inline-block;
+    padding: 5px 11px;
+    border-radius: 99px;
+    background: #e0f0e9;
+    color: #397a6c;
+    font-size: .78rem;
+    font-weight: 700;
+}
 
-    .metric-card:hover {
-        transform: translateY(-4px);
-        border-color: rgba(91, 190, 190, 0.48);
-    }
+.stButton > button {
+    border: 0;
+    border-radius: 13px;
+    padding: .62rem 1.1rem;
+    background: linear-gradient(100deg, #72b9ac, #80a9dc);
+    color: white;
+    font-weight: 700;
+    transition: all .2s ease;
+}
 
-    .metric-label {
-        color: var(--muted);
-        font-size: 0.86rem;
-        margin-bottom: 12px;
-    }
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 7px 18px rgba(87,151,162,.25);
+    color: white;
+}
 
-    .metric-value {
-        color: #f5f7ff;
-        font-size: 2rem;
-        font-weight: 800;
-        font-family: 'Manrope', sans-serif;
-    }
+div[data-baseweb="input"] input,
+div[data-baseweb="select"] > div,
+textarea {
+    background: rgba(255,255,255,.8) !important;
+    border-radius: 12px !important;
+}
 
-    .metric-note {
-        color: #83d7bc;
-        font-size: 0.78rem;
-        margin-top: 4px;
-    }
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #e3eee8, #e9e7f8, #f7e9ef);
+    border-right: 1px solid rgba(255,255,255,.8);
+}
 
-    .info-panel {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 14px;
-    }
+[data-testid="stSidebar"] * {
+    color: #26364a;
+}
 
-    .small-muted {
-        color: var(--muted);
-        font-size: 0.88rem;
-    }
+div[data-testid="stDataFrame"] {
+    border-radius: 16px;
+    overflow: hidden;
+}
 
-    .stButton > button,
-    .stFormSubmitButton > button {
-        border-radius: 10px;
-        border: 1px solid rgba(104, 180, 211, 0.35);
-        background: linear-gradient(100deg, #356ed0, #238e91);
-        color: white;
-        font-weight: 700;
-        transition: all 0.2s ease;
-    }
+hr {
+    border-color: rgba(116,137,165,.18);
+}
 
-    .stButton > button:hover,
-    .stFormSubmitButton > button:hover {
-        border-color: #7edfd0;
-        transform: translateY(-1px);
-        color: white;
-    }
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
-    [data-testid="stMetric"] {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        padding: 16px;
-        border-radius: 14px;
-    }
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-7px); }
+}
 
-    [data-testid="stMetricLabel"] { color: var(--muted); }
-    [data-testid="stMetricValue"] { color: #f5f7ff; }
+.float-icon {
+    display: inline-block;
+    animation: float 3s ease-in-out infinite;
+    font-size: 3rem;
+}
 
-    [data-baseweb="tab-list"] {
-        gap: 8px;
-        border-bottom: 1px solid var(--border);
-    }
+.footer {
+    text-align: center;
+    padding: 22px 0 5px;
+    color: #78869a;
+    font-size: .82rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
-    [data-baseweb="tab"] {
-        background: rgba(29, 45, 77, 0.6);
-        border-radius: 10px 10px 0 0;
-        padding: 12px 18px;
-    }
-
-    [data-baseweb="tab"][aria-selected="true"] {
-        background: rgba(54, 123, 157, 0.30);
-    }
-
-    input, textarea {
-        background-color: rgba(15, 28, 53, 0.75) !important;
-    }
-
-    hr { border-color: var(--border); }
-
-    @media (prefers-reduced-motion: reduce) {
-        *, *::before, *::after {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-        }
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# --------------------------------------------------
-# Demo data: created automatically if CSV is missing
-# --------------------------------------------------
+# =========================================================
+# DATA MANAGEMENT
+# =========================================================
 
 COLUMNS = [
-    "id", "text", "category", "urgency",
-    "lat", "lon", "date", "issue_id", "status"
+    "complaint_id",
+    "title",
+    "description",
+    "category",
+    "location",
+    "priority",
+    "status",
+    "submitted_by",
+    "created_at",
+    "officer_note",
+    "photo_path",
 ]
-
-SAMPLE_ROWS = [
-    ["C001", "Large pothole near the main market", "Roads", 5, 22.7196, 75.8577, "2026-10-20", "ISS-001", "Open"],
-    ["C002", "Road damaged near the bus stop", "Roads", 4, 22.7210, 75.8610, "2026-10-21", "ISS-001", "Open"],
-    ["C003", "Pothole causing traffic problems", "Roads", 5, 22.7185, 75.8550, "2026-10-22", "ISS-001", "Open"],
-    ["C004", "Water supply has been interrupted", "Water", 4, 22.7250, 75.8500, "2026-10-20", "ISS-002", "Open"],
-    ["C005", "No water supply since yesterday", "Water", 5, 22.7260, 75.8510, "2026-10-21", "ISS-002", "Open"],
-    ["C006", "Garbage has not been collected", "Sanitation", 3, 22.7150, 75.8650, "2026-10-20", "ISS-003", "Open"],
-    ["C007", "Overflowing garbage bin near the park", "Sanitation", 4, 22.7160, 75.8660, "2026-10-22", "ISS-003", "Open"],
-    ["C008", "Streetlight not working on this road", "Streetlights", 3, 22.7300, 75.8700, "2026-10-20", "ISS-004", "Open"],
-    ["C009", "The street is very dark at night", "Streetlights", 4, 22.7310, 75.8690, "2026-10-22", "ISS-004", "Open"],
-    ["C010", "Broken road surface near school", "Roads", 4, 22.7220, 75.8580, "2026-10-23", "ISS-001", "Open"],
-    ["C011", "Dirty water coming from the tap", "Water", 5, 22.7270, 75.8520, "2026-10-23", "ISS-005", "Open"],
-    ["C012", "Waste scattered beside the road", "Sanitation", 3, 22.7140, 75.8640, "2026-10-23", "ISS-003", "Open"],
-    ["C013", "Streetlight flickers and switches off", "Streetlights", 3, 22.7320, 75.8710, "2026-10-23", "ISS-004", "Open"],
-    ["C014", "Deep pothole creating accident risk", "Roads", 5, 22.7205, 75.8560, "2026-10-24", "ISS-001", "Open"],
-    ["C015", "Low water pressure in the neighbourhood", "Water", 3, 22.7280, 75.8530, "2026-10-24", "ISS-002", "Open"],
-]
-
-
-def ensure_csv():
-    if not CSV_PATH.exists():
-        pd.DataFrame(SAMPLE_ROWS, columns=COLUMNS).to_csv(CSV_PATH, index=False)
 
 
 def load_data():
-    ensure_csv()
-    df = pd.read_csv(CSV_PATH)
+    if not os.path.exists(DATA_FILE):
+        return pd.DataFrame(columns=COLUMNS)
 
-    for col in COLUMNS:
-        if col not in df.columns:
-            df[col] = None
+    try:
+        df = pd.read_csv(DATA_FILE)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError):
+        return pd.DataFrame(columns=COLUMNS)
 
-    df["urgency"] = pd.to_numeric(df["urgency"], errors="coerce").fillna(3)
-    df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
-    df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
-    df["category"] = df["category"].fillna("Other")
-    df["status"] = df["status"].fillna("Open")
-    df["text"] = df["text"].fillna("")
-    df["issue_id"] = df["issue_id"].fillna("ISS-NEW")
+    # Add new columns to older CSV files automatically.
+    for column in COLUMNS:
+        if column not in df.columns:
+            df[column] = ""
+
     return df
 
 
 def save_data(df):
-    df.to_csv(CSV_PATH, index=False)
+    os.makedirs(DATA_DIR, exist_ok=True)
+    df.to_csv(DATA_FILE, index=False)
 
 
-def priority_score(group):
-    # Demo ranking only; weights are provisional and not validated.
-    volume = min(len(group) / 5, 1) * 35
-    severity = (group["urgency"].mean() / 5) * 30
-    duration = 10  # Placeholder until issue duration is calculated reliably.
-    concentration = min(len(group) / 8, 1) * 15
-    return round(volume + severity + duration + concentration, 1)
-
-
-def make_issue_table(df):
-    if df.empty:
-        return pd.DataFrame()
-
-    rows = []
-    for issue_id, group in df.groupby("issue_id"):
-        rows.append({
-            "Issue ID": issue_id,
-            "Category": group["category"].mode().iloc[0],
-            "Complaints": len(group),
-            "Avg. urgency": round(group["urgency"].mean(), 1),
-            "Priority score": priority_score(group),
-            "Status": group["status"].mode().iloc[0],
-            "Example complaint": group["text"].iloc[0],
-        })
-
-    return pd.DataFrame(rows).sort_values(
-        "Priority score", ascending=False
-    ).reset_index(drop=True)
-
-
-df = load_data()
-issues = make_issue_table(df)
-
-# --------------------------------------------------
-# Sidebar
-# --------------------------------------------------
-
-with st.sidebar:
-    if LOGO_PATH.exists():
-        st.image(str(LOGO_PATH), use_container_width=True)
-    else:
-        st.markdown("## <span style='color:#64d7b0'>Civic</span>AI", unsafe_allow_html=True)
-
-    st.caption("CIVIC ISSUE INTELLIGENCE")
-    st.divider()
-
-    page = st.radio(
-        "NAVIGATION",
-        [
-            "Overview",
-            "Report a complaint",
-            "Issue intelligence",
-            "Issue map",
-            "Officer action",
-        ],
-    )
-
-    st.divider()
-    st.markdown("**Prototype status**")
-    st.markdown(
-        "<span style='color:#7ed9bd'>●</span> Demo mode",
-        unsafe_allow_html=True,
-    )
-    st.caption("Sample data is used unless you add real, authorized data.")
-
-# --------------------------------------------------
-# Hero
-# --------------------------------------------------
-
-if LOGO_PATH.exists():
-    left, right = st.columns([1, 5], vertical_alignment="center")
-    with left:
-        st.image(str(LOGO_PATH), width=125)
-    with right:
-        st.markdown(
-            """
-            <div class="hero">
-                <div class="eyebrow">Civic Issue Intelligence</div>
-                <div class="hero-title">One issue.<br><span class="accent">One clear priority.</span></div>
-                <div class="hero-subtitle">
-                    Turn scattered civic complaints into grouped issues and
-                    actionable priorities for municipal teams.
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-else:
-    st.markdown(
-        """
-        <div class="hero">
-            <div class="eyebrow">Civic Issue Intelligence</div>
-            <div class="hero-title">One issue.<br><span class="accent">One clear priority.</span></div>
-            <div class="hero-subtitle">
-                Turn scattered civic complaints into grouped issues and
-                actionable priorities for municipal teams.
-            </div>
-            <div class="small-muted" style="margin-top:12px">
-                Add your logo as <b>civicai_logo.png</b> in the project folder.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# --------------------------------------------------
-# Page: Overview
-# --------------------------------------------------
-
-if page == "Overview":
-    st.markdown('<div class="section-kicker">Live prototype overview</div>', unsafe_allow_html=True)
-    st.subheader("Civic issues at a glance")
-
-    total = len(df)
-    open_count = int((df["status"].str.lower() != "resolved").sum())
-    category_count = int(df["category"].nunique())
-    high_urgency = int((df["urgency"] >= 4).sum())
-
-    m1, m2, m3, m4 = st.columns(4)
-
-    metrics = [
-        (m1, "Complaints received", total, "Across demo data"),
-        (m2, "Issues identified", len(issues), "Grouped issue IDs"),
-        (m3, "Needs attention", high_urgency, "Urgency 4 or 5"),
-        (m4, "Categories", category_count, "Civic service areas"),
+def create_demo_data():
+    rows = [
+        {
+            "complaint_id": "CA-1001",
+            "title": "Garbage not collected",
+            "description": "Garbage has accumulated near the main road.",
+            "category": "Waste Management",
+            "location": "Bhawarkua, Indore",
+            "priority": "High",
+            "status": "Submitted",
+            "submitted_by": "demo",
+            "created_at": "2026-10-20 09:30",
+            "officer_note": "",
+            "photo_path": "",
+        },
+        {
+            "complaint_id": "CA-1002",
+            "title": "Streetlight not working",
+            "description": "Streetlight near the residential lane is not working.",
+            "category": "Streetlights",
+            "location": "Vijay Nagar, Indore",
+            "priority": "Medium",
+            "status": "In Progress",
+            "submitted_by": "demo",
+            "created_at": "2026-10-21 18:10",
+            "officer_note": "Inspection requested.",
+            "photo_path": "",
+        },
+        {
+            "complaint_id": "CA-1003",
+            "title": "Water leakage",
+            "description": "Water is leaking from a roadside pipeline.",
+            "category": "Water Supply",
+            "location": "Palasia, Indore",
+            "priority": "High",
+            "status": "Submitted",
+            "submitted_by": "demo",
+            "created_at": "2026-10-22 11:15",
+            "officer_note": "",
+            "photo_path": "",
+        },
+        {
+            "complaint_id": "CA-1004",
+            "title": "Road damage",
+            "description": "Potholes are causing problems for commuters.",
+            "category": "Roads",
+            "location": "Rajendra Nagar, Indore",
+            "priority": "Low",
+            "status": "Resolved",
+            "submitted_by": "demo",
+            "created_at": "2026-10-18 14:20",
+            "officer_note": "Repair marked complete in demo.",
+            "photo_path": "",
+        },
     ]
 
-    for col, label, value, note in metrics:
-        with col:
-            st.markdown(
-                f"""
-                <div class="metric-card">
-                    <div class="metric-label">{label}</div>
-                    <div class="metric-value">{value}</div>
-                    <div class="metric-note">{note}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    return pd.DataFrame(rows, columns=COLUMNS)
 
-    st.write("")
-    left, right = st.columns([1.15, 1])
+
+def initialize_data():
+    if not os.path.exists(DATA_FILE):
+        save_data(create_demo_data())
+
+
+initialize_data()
+
+# =========================================================
+# PRIORITY SCORING
+# =========================================================
+
+def calculate_priority(category, description):
+    text = f"{category} {description}".lower()
+
+    urgent_words = [
+        "emergency", "danger", "accident", "severe",
+        "overflow", "exposed wire", "unsafe", "urgent",
+    ]
+
+    high_words = [
+        "leak", "blocked", "broken", "garbage",
+        "pothole", "water", "damage", "not working",
+    ]
+
+    if any(word in text for word in urgent_words):
+        return "High"
+
+    if any(word in text for word in high_words):
+        return "High"
+
+    return "Medium"
+
+
+def make_complaint_id(df):
+    existing = (
+        set(df["complaint_id"].astype(str))
+        if not df.empty else set()
+    )
+
+    while True:
+        new_id = f"CA-{uuid.uuid4().hex[:6].upper()}"
+        if new_id not in existing:
+            return new_id
+
+
+def safe_string(value):
+    if pd.isna(value):
+        return ""
+    return str(value)
+
+
+def show_complaint_photo(row, heading="📷 Attached photo"):
+    """Display an attached photo if its file exists."""
+    photo_path = safe_string(row.get("photo_path", ""))
+
+    if photo_path and os.path.isfile(photo_path):
+        st.subheader(heading)
+        st.image(
+            photo_path,
+            caption=f"Complaint {safe_string(row.get('complaint_id', ''))}",
+            use_container_width=True,
+        )
+    else:
+        st.caption("No photo attached to this complaint.")
+
+
+# =========================================================
+# LOGIN AND SESSION STATE
+# =========================================================
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if "role" not in st.session_state:
+    st.session_state.role = None
+
+if "username" not in st.session_state:
+    st.session_state.username = None
+
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
+
+if "login_choice" not in st.session_state:
+    st.session_state.login_choice = None
+
+
+# Demo-only accounts. Do not use these as production credentials.
+DEMO_USERS = {
+    "citizen": {
+        "password": "citizen123",
+        "role": "Citizen",
+    },
+    "officer": {
+        "password": "officer123",
+        "role": "Officer",
+    },
+}
+
+
+def logout():
+    st.session_state.authenticated = False
+    st.session_state.role = None
+    st.session_state.username = None
+    st.session_state.page = "Home"
+    st.session_state.login_choice = None
+    st.rerun()
+
+
+def login_screen():
+    st.markdown("""
+    <div class="hero">
+        <div class="section-label">WELCOME TO CIVICAI</div>
+        <div class="hero-title">Your city.<br><span>Your voice.</span></div>
+        <p class="subtitle">
+            A smarter way to report civic problems, track complaints,
+            and help make neighbourhoods better.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    left, right = st.columns(2, gap="large")
 
     with left:
-        st.markdown("### Highest-priority issues")
-        if not issues.empty:
+        st.markdown("""
+        <div class="soft-card">
+            <div class="float-icon">🌿</div>
+            <h2>Citizen Portal</h2>
+            <p>Report civic issues, track your complaints,
+            and stay updated on their progress.</p>
+            <span class="pill">For residents</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button(
+            "Continue as Citizen →",
+            key="citizen_choice",
+            use_container_width=True,
+        ):
+            st.session_state.login_choice = "Citizen"
+
+    with right:
+        st.markdown("""
+        <div class="soft-card">
+            <div class="float-icon">🏛️</div>
+            <h2>Officer Portal</h2>
+            <p>Review complaints, monitor issue trends,
+            and update complaint resolution status.</p>
+            <span class="pill">For civic officers</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button(
+            "Continue as Officer →",
+            key="officer_choice",
+            use_container_width=True,
+        ):
+            st.session_state.login_choice = "Officer"
+
+    choice = st.session_state.login_choice
+
+    if choice:
+        st.divider()
+        st.subheader(f"🔐 {choice} Login")
+
+        with st.form("login_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button(
+                "Login",
+                use_container_width=True,
+            )
+
+        if submitted:
+            username_key = username.strip().lower()
+            user = DEMO_USERS.get(username_key)
+
+            if (
+                user
+                and user["password"] == password
+                and user["role"] == choice
+            ):
+                st.session_state.authenticated = True
+                st.session_state.role = user["role"]
+                st.session_state.username = username_key
+                st.session_state.page = (
+                    "My dashboard"
+                    if choice == "Citizen"
+                    else "Overview"
+                )
+                st.rerun()
+            else:
+                st.error("Invalid credentials for this portal.")
+
+        st.info(
+            "Demo credentials: citizen / citizen123 or "
+            "officer / officer123. These are only for local testing."
+        )
+
+    st.markdown("""
+    <div class="footer">
+        CivicAI • Prototype for smarter, more responsive cities
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# Display login page before authentication.
+if not st.session_state.authenticated:
+    login_screen()
+    st.stop()
+
+
+# =========================================================
+# SIDEBAR AND NAVIGATION
+# =========================================================
+
+role = st.session_state.role
+username = st.session_state.username
+df = load_data()
+
+st.sidebar.markdown("""
+<div style="padding:8px 0 18px 0;">
+    <div style="font-size:2rem;">🏙️</div>
+    <h2 style="margin:0;">CivicAI</h2>
+    <p style="color:#65758b; margin-top:4px;">
+        Smart Civic Portal
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("---")
+st.sidebar.write(f"👤 **{username}**")
+st.sidebar.caption(f"Signed in as {role}")
+
+if role == "Citizen":
+    pages = [
+        "My dashboard",
+        "Report a complaint",
+        "My complaints",
+    ]
+else:
+    pages = [
+        "Overview",
+        "Issue intelligence",
+        "Issue map",
+        "Officer action",
+        "All complaints",
+    ]
+
+if st.session_state.page not in pages:
+    st.session_state.page = pages[0]
+
+page = st.sidebar.radio(
+    "Navigation",
+    pages,
+    index=pages.index(st.session_state.page),
+)
+st.session_state.page = page
+
+st.sidebar.markdown("---")
+
+if st.sidebar.button("🚪 Log out", use_container_width=True):
+    logout()
+
+st.sidebar.caption("CivicAI prototype • Local CSV storage")
+
+
+# =========================================================
+# REUSABLE UI FUNCTIONS
+# =========================================================
+
+def metric_card(label, value, icon):
+    st.markdown(f"""
+    <div class="metric-card">
+        <div style="font-size:1.5rem;">{icon}</div>
+        <div class="metric-label">{label}</div>
+        <div class="metric-value">{value}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def show_metrics(data):
+    total = len(data)
+
+    if total:
+        open_count = int((data["status"] != "Resolved").sum())
+        resolved_count = int((data["status"] == "Resolved").sum())
+        high_count = int((data["priority"] == "High").sum())
+    else:
+        open_count = resolved_count = high_count = 0
+
+    a, b, c, d = st.columns(4)
+
+    with a:
+        metric_card("Total complaints", total, "📋")
+    with b:
+        metric_card("Open complaints", open_count, "⏳")
+    with c:
+        metric_card("Resolved", resolved_count, "✅")
+    with d:
+        metric_card("High priority", high_count, "🚨")
+
+
+def show_complaints_table(data):
+    if data.empty:
+        st.info("No complaints found.")
+        return
+
+    display_columns = [
+        "complaint_id",
+        "title",
+        "category",
+        "location",
+        "priority",
+        "status",
+        "created_at",
+    ]
+
+    available_columns = [
+        col for col in display_columns if col in data.columns
+    ]
+
+    st.dataframe(
+        data[available_columns],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+
+def status_badge(status):
+    icons = {
+        "Submitted": "🟡",
+        "In Progress": "🔵",
+        "Resolved": "🟢",
+    }
+    return f"{icons.get(status, '⚪')} {status}"
+
+
+# =========================================================
+# CITIZEN PORTAL
+# =========================================================
+
+if role == "Citizen":
+
+    if page == "My dashboard":
+        st.markdown("""
+        <div class="hero">
+            <div class="section-label">CITIZEN SPACE</div>
+            <div class="hero-title">Hello, <span>neighbour!</span> 👋</div>
+            <p class="subtitle">
+                Your voice can make a difference. Report an issue
+                and help your community move forward.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        my_data = df[
+            df["submitted_by"].astype(str).str.lower()
+            == username.lower()
+        ].copy()
+
+        show_metrics(my_data)
+
+        st.subheader("📌 Your recent complaints")
+        show_complaints_table(
+            my_data.sort_values(
+                "created_at", ascending=False
+            ).head(5)
+        )
+
+        if st.button("➕ Report a new issue"):
+            st.session_state.page = "Report a complaint"
+            st.rerun()
+
+    elif page == "Report a complaint":
+        st.markdown("""
+        <div class="hero">
+            <div class="section-label">MAKE YOUR VOICE HEARD</div>
+            <div class="hero-title">Report an <span>issue.</span></div>
+            <p class="subtitle">
+                Share accurate details so the relevant team can
+                review your complaint.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # -------------------------------------------------
+        # NEW: PHOTO CAPTURE / UPLOAD
+        # -------------------------------------------------
+
+        st.subheader("📷 Attach a photo (optional)")
+
+        photo_option = st.radio(
+            "Choose how to add a photo",
+            ["No photo", "Take a live photo", "Upload a photo"],
+            horizontal=True,
+            key="photo_option",
+        )
+
+        photo = None
+
+        if photo_option == "Take a live photo":
+            photo = st.camera_input(
+                "Take a picture of the civic issue",
+                key="complaint_camera",
+            )
+
+        elif photo_option == "Upload a photo":
+            photo = st.file_uploader(
+                "Choose an image from your device",
+                type=["jpg", "jpeg", "png"],
+                key="complaint_upload",
+                help="Supported formats: JPG, JPEG and PNG.",
+            )
+
+        if photo is not None:
+            if photo.size > 10 * 1024 * 1024:
+                st.error("Image must be smaller than 10 MB.")
+                photo = None
+            else:
+                st.image(
+                    photo,
+                    caption="Photo preview",
+                    use_container_width=True,
+                )
+
+        # -------------------------------------------------
+        # EXISTING COMPLAINT FORM
+        # -------------------------------------------------
+
+        with st.form("complaint_form", clear_on_submit=True):
+            title = st.text_input(
+                "Complaint title",
+                placeholder="e.g. Streetlight not working",
+            )
+
+            category = st.selectbox(
+                "Issue category",
+                [
+                    "Roads",
+                    "Waste Management",
+                    "Water Supply",
+                    "Streetlights",
+                    "Drainage",
+                    "Public Safety",
+                    "Other",
+                ],
+            )
+
+            location = st.text_input(
+                "Location",
+                placeholder="Area, street, or nearby landmark",
+            )
+
+            description = st.text_area(
+                "Describe the problem",
+                placeholder="Explain what happened and where...",
+                height=140,
+            )
+
+            submitted = st.form_submit_button(
+                "📨 Submit complaint",
+                use_container_width=True,
+            )
+
+        if submitted:
+            if (
+                not title.strip()
+                or not location.strip()
+                or not description.strip()
+            ):
+                st.error(
+                    "Please fill in the title, location, and description."
+                )
+
+            elif photo_option != "No photo" and photo is None:
+                st.error(
+                    "Please capture or upload a valid image, "
+                    "or select No photo."
+                )
+
+            else:
+                current_df = load_data()
+                priority = calculate_priority(category, description)
+                complaint_id = make_complaint_id(current_df)
+                photo_path = ""
+
+                # Save the image using the complaint ID.
+                if photo is not None:
+                    extension = (
+                        ".png"
+                        if photo.type == "image/png"
+                        else ".jpg"
+                    )
+
+                    image_filename = f"{complaint_id}{extension}"
+                    destination = os.path.join(
+                        UPLOAD_DIR,
+                        image_filename,
+                    )
+
+                    with open(destination, "wb") as image_file:
+                        image_file.write(photo.getvalue())
+
+                    photo_path = destination
+
+                new_complaint = {
+                    "complaint_id": complaint_id,
+                    "title": title.strip(),
+                    "description": description.strip(),
+                    "category": category,
+                    "location": location.strip(),
+                    "priority": priority,
+                    "status": "Submitted",
+                    "submitted_by": username,
+                    "created_at": datetime.now().strftime(
+                        "%Y-%m-%d %H:%M"
+                    ),
+                    "officer_note": "",
+                    "photo_path": photo_path,
+                }
+
+                updated_df = pd.concat(
+                    [
+                        current_df,
+                        pd.DataFrame([new_complaint]),
+                    ],
+                    ignore_index=True,
+                )
+
+                save_data(updated_df)
+
+                st.success(
+                    "Complaint submitted successfully! "
+                    f"Your complaint ID is {complaint_id}."
+                )
+
+                if photo_path:
+                    st.success(
+                        "Your photo has been attached to the complaint."
+                    )
+
+                st.info(f"Suggested priority: {priority}")
+
+                # Clear the photo widgets after successful submission.
+                st.session_state.pop("complaint_camera", None)
+                st.session_state.pop("complaint_upload", None)
+                st.session_state.pop("photo_option", None)
+
+    elif page == "My complaints":
+        st.markdown("""
+        <div class="hero">
+            <div class="section-label">YOUR ACTIVITY</div>
+            <div class="hero-title">My <span>complaints.</span></div>
+            <p class="subtitle">
+                Track the progress of issues submitted through your account.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        my_data = df[
+            df["submitted_by"].astype(str).str.lower()
+            == username.lower()
+        ].copy()
+
+        if not my_data.empty:
+            status_filter = st.selectbox(
+                "Filter by status",
+                ["All", "Submitted", "In Progress", "Resolved"],
+            )
+
+            if status_filter != "All":
+                my_data = my_data[
+                    my_data["status"] == status_filter
+                ]
+
+        show_complaints_table(
+            my_data.sort_values("created_at", ascending=False)
+        )
+
+        if not my_data.empty:
+            st.subheader("Complaint details")
+
+            selected_id = st.selectbox(
+                "Select complaint ID",
+                my_data["complaint_id"].astype(str).tolist(),
+            )
+
+            selected = my_data[
+                my_data["complaint_id"].astype(str) == selected_id
+            ].iloc[0]
+
+            show_complaint_photo(
+                selected,
+                heading="📷 Your attached photo",
+            )
+
+            st.markdown(f"""
+            <div class="soft-card">
+                <h3>{safe_string(selected['title'])}</h3>
+                <p><b>Complaint ID:</b>
+                    {safe_string(selected['complaint_id'])}</p>
+                <p><b>Category:</b>
+                    {safe_string(selected['category'])}</p>
+                <p><b>Location:</b>
+                    {safe_string(selected['location'])}</p>
+                <p><b>Status:</b>
+                    {status_badge(safe_string(selected['status']))}</p>
+                <p><b>Description:</b>
+                    {safe_string(selected['description'])}</p>
+                <p><b>Officer note:</b>
+                    {safe_string(selected['officer_note']) or 'No update yet.'}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+# =========================================================
+# OFFICER PORTAL
+# =========================================================
+
+elif role == "Officer":
+
+    if page == "Overview":
+        st.markdown("""
+        <div class="hero">
+            <div class="section-label">OFFICER WORKSPACE</div>
+            <div class="hero-title">City <span>overview.</span> 🏛️</div>
+            <p class="subtitle">
+                Monitor citizen complaints, identify urgent issues,
+                and track resolution progress.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        show_metrics(df)
+
+        st.subheader("📋 Latest complaints")
+        show_complaints_table(
+            df.sort_values("created_at", ascending=False).head(10)
+        )
+
+        st.subheader("📊 Complaints by status")
+        if not df.empty:
+            st.bar_chart(df["status"].value_counts())
+
+        st.subheader("📍 Complaints by category")
+        if not df.empty:
+            st.bar_chart(df["category"].value_counts())
+
+    elif page == "Issue intelligence":
+        st.markdown("""
+        <div class="hero">
+            <div class="section-label">DATA-DRIVEN DECISIONS</div>
+            <div class="hero-title">Issue <span>intelligence.</span></div>
+            <p class="subtitle">
+                Explore recurring civic problems and understand
+                where attention may be needed.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if df.empty:
+            st.info("There are no complaints to analyse yet.")
+        else:
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Category distribution")
+                st.bar_chart(df["category"].value_counts())
+
+            with col2:
+                st.subheader("Priority distribution")
+                st.bar_chart(df["priority"].value_counts())
+
+            st.subheader("Status distribution")
+            st.bar_chart(df["status"].value_counts())
+
+            st.subheader("Repeated locations")
+
+            location_counts = (
+                df.groupby("location")
+                .size()
+                .reset_index(name="complaint_count")
+                .sort_values("complaint_count", ascending=False)
+            )
+
             st.dataframe(
-                issues[[
-                    "Issue ID", "Category", "Complaints",
-                    "Priority score", "Status"
+                location_counts,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            st.caption(
+                "Summaries are based on complaints stored in the CSV file."
+            )
+
+    elif page == "Issue map":
+        st.markdown("""
+        <div class="hero">
+            <div class="section-label">LOCATION AWARENESS</div>
+            <div class="hero-title">Issue <span>map.</span> 🗺️</div>
+            <p class="subtitle">
+                Review the reported locations of civic issues.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if df.empty:
+            st.info("No complaint locations are available.")
+        else:
+            st.warning(
+                "This prototype uses location names, not verified GPS "
+                "coordinates. This page shows a location list and "
+                "frequency chart, not a geographic heat map."
+            )
+
+            st.dataframe(
+                df[[
+                    "complaint_id",
+                    "title",
+                    "category",
+                    "location",
+                    "priority",
+                    "status",
                 ]],
                 use_container_width=True,
                 hide_index=True,
             )
-        else:
-            st.info("No issues available yet.")
 
-    with right:
-        st.markdown("### Complaints by category")
-        if not df.empty:
-            counts = df["category"].value_counts().rename_axis("Category").reset_index(name="Complaints")
-            st.bar_chart(counts.set_index("Category"))
-        else:
-            st.info("Submit a complaint to begin.")
+            st.subheader("Location frequency")
 
-    st.markdown(
-        """
-        <div class="info-panel">
-            <div class="section-kicker">How CivicAI works</div>
-            <b>Ingest → Understand → Cluster → Score → Act</b>
-            <p class="small-muted">
-                Collect reports, interpret the complaint, group related reports,
-                rank the issue, and prepare an officer action.
+            location_counts = (
+                df.groupby("location")
+                .size()
+                .reset_index(name="complaint_count")
+                .sort_values("complaint_count", ascending=False)
+            )
+
+            st.bar_chart(
+                location_counts.set_index("location")["complaint_count"]
+            )
+
+    elif page == "Officer action":
+        st.markdown("""
+        <div class="hero">
+            <div class="section-label">COMPLAINT MANAGEMENT</div>
+            <div class="hero-title">Officer <span>actions.</span></div>
+            <p class="subtitle">
+                Update complaint status and record an action note.
             </p>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+        """, unsafe_allow_html=True)
 
-# --------------------------------------------------
-# Page: Report a complaint
-# --------------------------------------------------
-
-elif page == "Report a complaint":
-    st.markdown('<div class="section-kicker">Community input</div>', unsafe_allow_html=True)
-    st.subheader("Report a civic issue")
-    st.write("Describe the issue in your own words. This demo saves the report locally.")
-
-    with st.form("complaint_form", clear_on_submit=True):
-        complaint_text = st.text_area(
-            "Complaint description",
-            placeholder="Example: There is a large pothole near the school gate...",
-            max_chars=1000,
-        )
-
-        c1, c2 = st.columns(2)
-        with c1:
-            category = st.selectbox(
-                "Category",
-                ["Roads", "Water", "Sanitation", "Streetlights", "Other"],
-            )
-            urgency = st.slider("Urgency", 1, 5, 3)
-
-        with c2:
-            lat = st.number_input("Latitude", value=22.7196, format="%.6f")
-            lon = st.number_input("Longitude", value=75.8577, format="%.6f")
-
-        submitted = st.form_submit_button("Submit complaint", use_container_width=True)
-
-    if submitted:
-        if len(complaint_text.strip()) < 8:
-            st.error("Please enter a little more detail about the issue.")
+        if df.empty:
+            st.info("There are no complaints to update.")
         else:
-            new_id = "C" + uuid.uuid4().hex[:6].upper()
+            complaint_ids = df["complaint_id"].astype(str).tolist()
 
-            # Simple demo grouping: assign an existing issue in the same category.
-            matching = df[df["category"].str.lower() == category.lower()]
-            if not matching.empty:
-                issue_id = matching["issue_id"].mode().iloc[0]
-            else:
-                issue_id = "ISS-" + uuid.uuid4().hex[:4].upper()
-
-            new_row = {
-                "id": new_id,
-                "text": complaint_text.strip(),
-                "category": category,
-                "urgency": urgency,
-                "lat": lat,
-                "lon": lon,
-                "date": str(date.today()),
-                "issue_id": issue_id,
-                "status": "Open",
-            }
-
-            updated = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            save_data(updated)
-            st.success(f"Complaint saved! Reference: {new_id}")
-            st.caption("This is local demo storage, not a live municipal submission.")
-            st.rerun()
-
-# --------------------------------------------------
-# Page: Issue intelligence
-# --------------------------------------------------
-
-elif page == "Issue intelligence":
-    st.markdown('<div class="section-kicker">Prioritization engine</div>', unsafe_allow_html=True)
-    st.subheader("Grouped civic issues")
-    st.caption(
-        "Priority scores are illustrative. Duration and concentration use demo assumptions; "
-        "these weights have not been validated."
-    )
-
-    category_filter = st.selectbox(
-        "Filter by category",
-        ["All categories"] + sorted(df["category"].unique().tolist()),
-    )
-
-    filtered = df.copy()
-    if category_filter != "All categories":
-        filtered = filtered[filtered["category"] == category_filter]
-
-    filtered_issues = make_issue_table(filtered)
-
-    if not filtered_issues.empty:
-        st.dataframe(filtered_issues, use_container_width=True, hide_index=True)
-
-        st.markdown("### Why is an issue ranked this way?")
-        selected_issue = st.selectbox(
-            "Choose an issue",
-            filtered_issues["Issue ID"].tolist(),
-        )
-        group = filtered[filtered["issue_id"] == selected_issue]
-
-        score_volume = round(min(len(group) / 5, 1) * 35, 1)
-        score_severity = round((group["urgency"].mean() / 5) * 30, 1)
-        score_duration = 10
-        score_concentration = round(min(len(group) / 8, 1) * 15, 1)
-
-        with st.expander("View score breakdown", expanded=True):
-            st.write(f"**Complaint volume — 35% weight:** {score_volume}/35")
-            st.write(f"**Average severity — 30% weight:** {score_severity}/30")
-            st.write(f"**Duration — 20% weight:** {score_duration}/20 (demo placeholder)")
-            st.write(f"**Concentration — 15% weight:** {score_concentration}/15 (demo proxy)")
-            st.progress(min(priority_score(group) / 100, 1.0))
-            st.write(f"**Illustrative total:** {priority_score(group)}/100")
-
-            st.markdown("**Related reports**")
-            st.dataframe(group[["id", "text", "urgency", "date", "status"]], hide_index=True, use_container_width=True)
-    else:
-        st.info("No issues match this filter.")
-
-# --------------------------------------------------
-# Page: Issue map
-# --------------------------------------------------
-
-elif page == "Issue map":
-    st.markdown('<div class="section-kicker">Geographic view</div>', unsafe_allow_html=True)
-    st.subheader("Where are reports coming from?")
-    st.caption("The map uses sample coordinates around Indore. Replace them with verified coordinates for real deployment.")
-
-    map_df = df.dropna(subset=["lat", "lon"]).copy()
-
-    if not map_df.empty:
-        color_map = {
-            "Roads": [74, 139, 238, 190],
-            "Water": [52, 190, 180, 190],
-            "Sanitation": [244, 169, 83, 190],
-            "Streetlights": [167, 130, 239, 190],
-            "Other": [180, 190, 210, 190],
-        }
-
-        map_df["color"] = map_df["category"].map(color_map)
-        map_df["radius"] = map_df["urgency"].apply(lambda value: 120 + int(value) * 45)
-
-        layer = pdk.Layer(
-            "ScatterplotLayer",
-            data=map_df,
-            get_position="[lon, lat]",
-            get_fill_color="color",
-            get_radius="radius",
-            pickable=True,
-            opacity=0.8,
-            stroked=True,
-            get_line_color=[220, 235, 255, 180],
-            line_width_min_pixels=1,
-        )
-
-        view = pdk.ViewState(
-            latitude=float(map_df["lat"].mean()),
-            longitude=float(map_df["lon"].mean()),
-            zoom=12,
-            pitch=25,
-        )
-
-        deck = pdk.Deck(
-            layers=[layer],
-            initial_view_state=view,
-            tooltip={
-                "html": "<b>{category}</b><br/>{text}<br/>Urgency: {urgency}/5",
-                "style": {"backgroundColor": "#172744", "color": "white"},
-            },
-            map_style=None,
-        )
-
-        st.pydeck_chart(deck, use_container_width=True)
-        st.caption("Circle size represents urgency. Colours represent categories.")
-    else:
-        st.info("No valid coordinates available.")
-
-    st.markdown("### Map legend")
-    st.write("🔵 Roads   |   🟢 Water   |   🟠 Sanitation   |   🟣 Streetlights")
-
-# --------------------------------------------------
-# Page: Officer action
-# --------------------------------------------------
-
-elif page == "Officer action":
-    st.markdown('<div class="section-kicker">From insight to action</div>', unsafe_allow_html=True)
-    st.subheader("Officer action centre")
-    st.caption(
-        "This is a mock approval workflow. It does not submit complaints to a real government portal."
-    )
-
-    if issues.empty:
-        st.info("No issues available yet.")
-    else:
-        chosen = st.selectbox(
-            "Select an issue",
-            issues["Issue ID"].tolist(),
-        )
-        selected = issues[issues["Issue ID"] == chosen].iloc[0]
-        related = df[df["issue_id"] == chosen]
-
-        st.markdown('<div class="info-panel">', unsafe_allow_html=True)
-        st.markdown(f"### {selected['Category']} · {chosen}")
-        st.write(selected["Example complaint"])
-        st.write(f"**Reports grouped:** {selected['Complaints']}")
-        st.write(f"**Illustrative priority:** {selected['Priority score']}/100")
-        st.write(f"**Current status:** {selected['Status']}")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        action = st.selectbox(
-            "Proposed officer action",
-            [
-                "Review issue",
-                "Assign field inspection",
-                "Forward to relevant department",
-                "Mark as resolved (demo only)",
-            ],
-        )
-
-        approved = st.checkbox(
-            "I approve this demo action for the selected issue."
-        )
-
-        if st.button("Confirm demo action", use_container_width=True):
-            if not approved:
-                st.warning("Please check the approval box before confirming.")
-            else:
-                if action == "Mark as resolved (demo only)":
-                    df.loc[df["issue_id"] == chosen, "status"] = "Resolved"
-                    save_data(df)
-                    st.success("Demo status updated to Resolved.")
-                    st.rerun()
-                else:
-                    st.success(f"Demo action recorded: {action}")
-                    st.info("No external complaint was filed. Live integration is not configured.")
-
-        with st.expander("View complaints linked to this issue"):
-            st.dataframe(
-                related[["id", "text", "urgency", "date", "status"]],
-                use_container_width=True,
-                hide_index=True,
+            selected_id = st.selectbox(
+                "Select complaint",
+                complaint_ids,
             )
 
-# --------------------------------------------------
-# Footer
-# --------------------------------------------------
+            row_index = df.index[
+                df["complaint_id"].astype(str) == selected_id
+            ][0]
 
-st.divider()
-st.caption(
-    "CivicAI · Prototype for civic issue intelligence · Demo data and provisional scoring · "
-    "Not connected to a live municipal system"
-)
+            selected = df.loc[row_index]
+
+            st.markdown(f"""
+            <div class="soft-card">
+                <h3>{safe_string(selected['title'])}</h3>
+                <p><b>Location:</b>
+                    {safe_string(selected['location'])}</p>
+                <p><b>Category:</b>
+                    {safe_string(selected['category'])}</p>
+                <p><b>Priority:</b>
+                    {safe_string(selected['priority'])}</p>
+                <p><b>Description:</b>
+                    {safe_string(selected['description'])}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # NEW: Show the photo attached by the citizen.
+            show_complaint_photo(
+                selected,
+                heading="📷 Citizen-submitted photo",
+            )
+
+            current_status = safe_string(selected["status"])
+            status_options = ["Submitted", "In Progress", "Resolved"]
+
+            if current_status not in status_options:
+                status_options.append(current_status)
+
+            current_note = safe_string(selected["officer_note"])
+
+            with st.form("officer_action_form"):
+                new_status = st.selectbox(
+                    "Update status",
+                    status_options,
+                    index=status_options.index(current_status),
+                )
+
+                officer_note = st.text_area(
+                    "Officer action note",
+                    value=current_note,
+                    placeholder="Add action or resolution details...",
+                )
+
+                save_action = st.form_submit_button(
+                    "💾 Save update",
+                    use_container_width=True,
+                )
+
+            if save_action:
+                updated_df = load_data()
+                match = (
+                    updated_df["complaint_id"].astype(str) == selected_id
+                )
+
+                updated_df.loc[match, "status"] = new_status
+                updated_df.loc[match, "officer_note"] = officer_note.strip()
+
+                save_data(updated_df)
+                st.success("Complaint update saved.")
+                st.rerun()
+
+    elif page == "All complaints":
+        st.markdown("""
+        <div class="hero">
+            <div class="section-label">COMPLAINT DIRECTORY</div>
+            <div class="hero-title">All <span>complaints.</span></div>
+            <p class="subtitle">
+                Search, filter, and review complaints submitted to CivicAI.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if df.empty:
+            st.info("No complaints have been submitted.")
+        else:
+            search_text = st.text_input(
+                "🔎 Search complaints",
+                placeholder="Search by ID, title, category, or location...",
+            )
+
+            filtered = df.copy()
+
+            if search_text.strip():
+                query = search_text.strip().lower()
+
+                searchable = (
+                    filtered["complaint_id"].astype(str)
+                    + " "
+                    + filtered["title"].astype(str)
+                    + " "
+                    + filtered["category"].astype(str)
+                    + " "
+                    + filtered["location"].astype(str)
+                ).str.lower()
+
+                filtered = filtered[
+                    searchable.str.contains(query, na=False)
+                ]
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                status_filter = st.selectbox(
+                    "Status",
+                    ["All", "Submitted", "In Progress", "Resolved"],
+                )
+
+            with col2:
+                priority_filter = st.selectbox(
+                    "Priority",
+                    ["All", "High", "Medium", "Low"],
+                )
+
+            if status_filter != "All":
+                filtered = filtered[
+                    filtered["status"] == status_filter
+                ]
+
+            if priority_filter != "All":
+                filtered = filtered[
+                    filtered["priority"] == priority_filter
+                ]
+
+            st.write(f"Showing **{len(filtered)}** complaint(s).")
+            show_complaints_table(filtered)
+
+            csv_data = filtered.to_csv(index=False).encode("utf-8")
+
+            st.download_button(
+                "⬇️ Export filtered complaints as CSV",
+                data=csv_data,
+                file_name="civicai_complaints.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+
+# =========================================================
+# FOOTER
+# =========================================================
+
+st.markdown("""
+<div class="footer">
+    CivicAI • A smart civic complaint management prototype<br>
+    Demo authentication and local CSV storage are intended for testing only.
+</div>
+""", unsafe_allow_html=True)
